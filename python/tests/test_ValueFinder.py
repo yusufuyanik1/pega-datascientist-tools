@@ -1,5 +1,5 @@
 """
-Testing the functionality of the ValueFinder class
+Testing the functionality of the ValueFinder class.
 """
 
 import pytest
