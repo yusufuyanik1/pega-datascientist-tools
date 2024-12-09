@@ -132,6 +132,9 @@ class ADMDatamart:
         self.combined_data = self.aggregates._combine_data(
             self.model_data, self.predictor_data
         )
+        self.model_data.head().collect().shape[0] == 5
+        self.predictor_data.head().collect().shape[0] == 5
+        self.combined_data.head().collect().shape[0] == 5
 
         self.bin_aggregator = BinAggregator(dm=self)  # attach after model_data
 
