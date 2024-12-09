@@ -1,3 +1,4 @@
+__all__ = ["Aggregates"]
 from typing import TYPE_CHECKING, Dict, Literal, Optional
 
 import polars as pl
@@ -446,6 +447,8 @@ class Aggregates:
                 ChannelDirectionGroup=pl.when(
                     pl.col("ChannelGroup").is_not_null()
                     & pl.col("DirectionGroup").is_not_null()
+                    & pl.col("ChannelGroup").is_in(["Other", "Unknown", ""]).not_()
+                    & pl.col("DirectionGroup").is_in(["Other", "Unknown", ""]).not_()
                 )
                 .then(pl.concat_str(["ChannelGroup", "DirectionGroup"], separator="/"))
                 .otherwise(pl.lit("Other")),

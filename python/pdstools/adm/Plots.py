@@ -1,3 +1,4 @@
+__all__ = ["Plots"]
 import logging
 from datetime import timedelta
 from functools import wraps
@@ -173,6 +174,7 @@ def distribution_graph(df: pl.LazyFrame, title: str):
 
 class Plots(LazyNamespace):
     dependencies = ["plotly"]
+    dependency_group = "adm"
 
     def __init__(self, datamart: "ADMDatamart"):
         self.datamart = datamart
@@ -294,15 +296,15 @@ class Plots(LazyNamespace):
 
         metric_formatting = {
             "SuccessRate_weighted_average": ":.4%",
-            "Performance_weighted_average": ":.2", # is not a percentage!
+            "Performance_weighted_average": ":.2",  # is not a percentage!
             "Positives": ":.d",
             "ResponseCount": ":.d",
         }
 
         if metric == "Performance":
-            metric_scaling:pl.Expr = pl.lit(100.0)
+            metric_scaling: pl.Expr = pl.lit(100.0)
         else:
-            metric_scaling:pl.Expr = pl.lit(1.0)
+            metric_scaling: pl.Expr = pl.lit(1.0)
 
         if self.datamart.model_data is None:
             raise ValueError("Visualisation requires model_data")
@@ -332,9 +334,10 @@ class Plots(LazyNamespace):
                     "SnapshotTime", every=every, group_by=grouping_columns
                 )
                 .agg(
-                    (metric_scaling*cdh_utils.weighted_average_polars(
-                        metric, "ResponseCount"
-                    )).name.suffix("_weighted_average")
+                    (
+                        metric_scaling
+                        * cdh_utils.weighted_average_polars(metric, "ResponseCount")
+                    ).name.suffix("_weighted_average")
                 )
                 .sort("SnapshotTime", by_col)
             )
@@ -659,6 +662,10 @@ class Plots(LazyNamespace):
             Whether to facet the plot into subplots, by default None
         return_df : bool, optional
             Whether to return a dataframe instead of a plot, by default False
+
+        See also
+        --------
+        pdstools.adm.ADMDatamart.apply_predictor_categorization : how to override the out of the box predictor categorization
         """
 
         metric = "PredictorPerformance" if metric == "Performance" else metric
@@ -761,6 +768,31 @@ class Plots(LazyNamespace):
         facet: Optional[Union[pl.Expr, str]] = None,
         return_df: bool = False,
     ):
+        """Plot the predictor category performance
+
+        Parameters
+        ----------
+        metric : str, optional
+            The metric to plot, by default "Performance"
+        active_only : bool, optional
+            Whether to only analyze active predictors, by default False
+        query : Optional[QUERY], optional
+            An optional query to apply, by default None
+        facet : Optional[Union[pl.Expr, str]], optional
+            By which columns to facet the result, by default None
+        return_df : bool, optional
+            An optional flag to get the dataframe instead, by default False
+
+        Returns
+        -------
+        px.Figure
+            A Plotly figure
+
+
+        See also
+        --------
+        pdstools.adm.ADMDatamart.apply_predictor_categorization : how to override the out of the box predictor categorization
+        """
         metric = "PredictorPerformance" if metric == "Performance" else metric
 
         # Determine columns to select and grouping
@@ -846,6 +878,26 @@ class Plots(LazyNamespace):
         query: Optional[QUERY] = None,
         return_df: bool = False,
     ):
+        """Plots the predictor contribution for each configuration
+
+        Parameters
+        ----------
+        by : str, optional
+            By which column to plot the contribution, by default "Configuration"
+        query : Optional[QUERY], optional
+            An optional query to apply to the data, by default None
+        return_df : bool, optional
+            An optional flag to get a Dataframe instead, by default False
+
+        Returns
+        -------
+        px.Figure
+            A plotly figure
+
+        See also
+        --------
+        pdstools.adm.ADMDatamart.apply_predictor_categorization : how to override the out of the box predictor categorization
+        """
         df = (
             cdh_utils._apply_query(
                 self.datamart.aggregates.last(table="combined_data"),
@@ -1142,7 +1194,7 @@ class Plots(LazyNamespace):
             return plot_df
 
         fig = px.bar(
-            plot_df.collect().to_pandas(use_pyarrow_extension_array=False),
+            plot_df.collect(), #.to_pandas(use_pyarrow_extension_array=False),
             x="Lift",
             y="BinSymbolAbbreviated",
             color="Direction",
@@ -1157,6 +1209,7 @@ class Plots(LazyNamespace):
             template="pega",
             custom_data=["PredictorName", "BinSymbol"],
             facet_col_wrap=3,
+            category_orders=plot_df.collect().to_dict(),
         )
         fig.update_traces(
             hovertemplate="<br>".join(
@@ -1174,7 +1227,6 @@ class Plots(LazyNamespace):
             type="category",
             categoryorder="array",
             automargin=True,
-            autorange="reversed",
             title="",
             dtick=1,  # show all bins
             matches=None,  # allow independent y-labels if there are row facets
@@ -1207,6 +1259,10 @@ class Plots(LazyNamespace):
             if show_plots and fig is not None:
                 fig.show()
         return figs
+
+
+    # TODO I took the propensity distrib plot out of the HC as 
+    # it wasn't very clear, also didn't look great visually.
 
     @requires(
         predictor_columns={
