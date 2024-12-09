@@ -3,7 +3,7 @@ name: Build & Deploy docs
 on:
   push:
     tags:
-      - '*'  # This will trigger on any tag push, regardless of changes
+      - '*'
     branches:
       - master # This branch filter applies only to the paths below
     paths:
