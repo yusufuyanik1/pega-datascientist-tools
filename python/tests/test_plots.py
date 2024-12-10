@@ -50,21 +50,25 @@ def test_proposition_success_rates(sample: ADMDatamart):
 
 
 def test_score_distribution(sample: ADMDatamart):
-    model_id = sample.aggregates.last(table="combined_data").filter(
-        pl.col("PredictorName") == "Classifier"
-    ).select("ModelID").collect().row(0)[0]
+    model_id = (
+        sample.aggregates.last(table="combined_data")
+        .filter(pl.col("PredictorName") == "Classifier")
+        .select("ModelID")
+        .collect()
+        .row(0)[0]
+    )
 
     df = sample.plot.score_distribution(model_id=model_id, return_df=True)
-    
+
     required_columns = {"BinIndex", "BinSymbol", "BinResponseCount", "BinPropensity"}
     assert all(col in df.collect_schema().names() for col in required_columns)
-    
+
     assert df.filter(pl.col("PredictorName") != "Classifier").collect().is_empty()
-    
+
     collected_df = df.collect()
     bin_indices = collected_df["BinIndex"].to_list()
     assert bin_indices == sorted(bin_indices)
-    
+
     with pytest.raises(ValueError, match="There is no data for the provided modelid"):
         sample.plot.score_distribution(model_id="invalid_id")
 
@@ -79,15 +83,15 @@ def test_multiple_score_distributions(sample: ADMDatamart):
         .select(pl.col("ModelID").unique())
         .collect()
     )
-    
+
     assert not model_ids.is_empty()
-    
+
     plots = sample.plot.multiple_score_distributions(show_all=False)
-    
+
     assert len(plots) == len(model_ids)
-    
+
     assert all(isinstance(plot, Figure) for plot in plots)
-    
+
     # Verify each plot has the required traces
     for plot in plots:
         assert len(plot.data) == 2
@@ -104,11 +108,11 @@ def test_predictor_binning(sample: ADMDatamart):
     )
     model_id = first_row[0]
     predictor_name = first_row[1]
-    
+
     df = sample.plot.predictor_binning(
         model_id=model_id, predictor_name=predictor_name, return_df=True
     )
-    
+
     assert not df.collect().is_empty()
 
     required_columns = ["BinIndex", "BinPropensity", "BinSymbol", "BinResponseCount"]
@@ -117,7 +121,6 @@ def test_predictor_binning(sample: ADMDatamart):
     collected_df = df.collect()
     bin_indices = collected_df["BinIndex"].to_list()
     assert bin_indices == sorted(bin_indices)
-    
     # Test error handling for invalid inputs
     with pytest.raises(ValueError):
         sample.plot.predictor_binning(
@@ -127,12 +130,10 @@ def test_predictor_binning(sample: ADMDatamart):
         sample.plot.predictor_binning(
             model_id=model_id, predictor_name="non_existent_predictor"
         )
-    
     plot = sample.plot.predictor_binning(
         model_id=model_id, predictor_name=predictor_name
     )
     assert isinstance(plot, Figure)
-    
     assert len(plot.data) == 2
     assert plot.data[0].type == "bar"  # Responses
     assert plot.data[1].type == "scatter"  # Propensity
@@ -140,7 +141,6 @@ def test_predictor_binning(sample: ADMDatamart):
 
 def test_multiple_predictor_binning(sample: ADMDatamart):
     model_id = sample.combined_data.select("ModelID").collect().row(0)[0]
-    
     expected_predictor_count = (
         sample.combined_data.filter(pl.col("ModelID") == model_id)
         .select("PredictorName")
@@ -148,13 +148,13 @@ def test_multiple_predictor_binning(sample: ADMDatamart):
         .collect()
         .shape[0]
     )
-    
+
     plots = sample.plot.multiple_predictor_binning(model_id=model_id, show_all=False)
-    
+
     assert isinstance(plots, list)
-    
+
     assert len(plots) == expected_predictor_count
-    
+
     assert all(isinstance(plot, Figure) for plot in plots)
     
     for plot in plots:
@@ -162,6 +162,13 @@ def test_multiple_predictor_binning(sample: ADMDatamart):
         assert plot.data[0].type == "bar"  # Responses
         assert plot.data[1].type == "scatter"  # Propensity
     
+    sample.plot.multiple_predictor_binning(model_id="invalid_id", show_all=False) == []
+
+    for plot in plots:
+        assert len(plot.data) == 2
+        assert plot.data[0].type == "bar"  # Responses
+        assert plot.data[1].type == "scatter"  # Propensity
+
     sample.plot.multiple_predictor_binning(model_id="invalid_id", show_all=False) == []
 
 
