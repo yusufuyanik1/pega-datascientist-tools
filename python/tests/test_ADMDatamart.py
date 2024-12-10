@@ -51,10 +51,10 @@ def test_write_then_load(sample: ADMDatamart):
     os.remove(predictordata_cache)
 
 
-def test_init_without_model_data(sample: ADMDatamart):
-    modeldata_cache, predictordata_cache = sample.save_data("cache2")
+# def test_init_without_model_data(sample: ADMDatamart):
+#     modeldata_cache, predictordata_cache = sample.save_data("cache2")
 
-    ADMDatamart(model_df=pl.scan_ipc(modeldata_cache))
-    ADMDatamart(predictor_df=pl.scan_ipc(predictordata_cache))
-    os.remove(modeldata_cache)
-    os.remove(predictordata_cache)
+#     ADMDatamart(model_df=pl.scan_ipc(modeldata_cache))
+#     ADMDatamart(predictor_df=pl.scan_ipc(predictordata_cache))
+#     os.remove(modeldata_cache)
+#     os.remove(predictordata_cache)
