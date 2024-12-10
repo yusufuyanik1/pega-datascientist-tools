@@ -50,6 +50,8 @@ def test_proposition_success_rates(sample: ADMDatamart):
 
 
 def test_score_distribution(sample: ADMDatamart):
+    sample.combined_data.collect().head(5).shape[0] ==5
+    sample.aggregates.last(table="combined_data").collect().head().shape[0] == 5
     model_id = (
         sample.aggregates.last(table="combined_data")
         .filter(pl.col("PredictorName") == "Classifier")
