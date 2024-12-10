@@ -57,4 +57,4 @@ def test_write_then_load(sample: ADMDatamart):
 #     ADMDatamart(model_df=pl.scan_ipc(modeldata_cache))
 #     ADMDatamart(predictor_df=pl.scan_ipc(predictordata_cache))
 #     os.remove(modeldata_cache)
-#     os.remove(predictordata_cache)
+
