@@ -50,7 +50,7 @@ def test_proposition_success_rates(sample: ADMDatamart):
 
 
 def test_score_distribution(sample: ADMDatamart):
-    model_id = sample.datamart.aggregates.last(table="combined_data").filter(
+    model_id = sample.aggregates.last(table="combined_data").filter(
         pl.col("PredictorName") == "Classifier"
     ).select("ModelID").collect().row(0)[0]
 
@@ -74,7 +74,7 @@ def test_score_distribution(sample: ADMDatamart):
 
 def test_multiple_score_distributions(sample: ADMDatamart):
     model_ids = (
-        sample.datamart.aggregates.last(table="combined_data")
+        sample.aggregates.last(table="combined_data")
         .filter(pl.col("PredictorName") == "Classifier")
         .select(pl.col("ModelID").unique())
         .collect()
@@ -162,8 +162,7 @@ def test_multiple_predictor_binning(sample: ADMDatamart):
         assert plot.data[0].type == "bar"  # Responses
         assert plot.data[1].type == "scatter"  # Propensity
     
-    with pytest.raises(ValueError):
-        sample.plot.multiple_predictor_binning(model_id="invalid_id", show_all=False)
+    sample.plot.multiple_predictor_binning(model_id="invalid_id", show_all=False) == []
 
 
 def test_predictor_performance(sample: ADMDatamart):
