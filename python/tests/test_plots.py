@@ -49,17 +49,29 @@ def test_proposition_success_rates(sample: ADMDatamart):
     assert plot is not None
 
 
-def test_score_distribution(sample: ADMDatamart): #testing
-    sample.combined_data.collect().head(5).shape[0] ==5
-    sample.aggregates.last(table="combined_data").collect().head().shape[0] == 5
-    model_id = (
+def test_score_distribution(sample: ADMDatamart):
+    # First get the latest snapshot time
+    latest_snapshot = (
         sample.aggregates.last(table="combined_data")
-        .filter(pl.col("PredictorName") == "Classifier")
-        .select("ModelID")
+        .select(pl.col("SnapshotTime").max())
         .collect()
-        .row(0)[0]
+        .item()
     )
+    
+    # Get classifier data from the latest snapshot
+    classifier_data = (
+        sample.aggregates.last(table="combined_data")
+        .filter(
+            (pl.col("PredictorName") == "Classifier") & 
+            (pl.col("SnapshotTime") == latest_snapshot)
+        )
+        .collect()
+    )
+    
+    # Then get a model_id from the materialized data
+    model_id = classifier_data.select("ModelID").row(0)[0]
 
+    # Now use that model_id for score distribution
     df = sample.plot.score_distribution(model_id=model_id, return_df=True)
 
     required_columns = {"BinIndex", "BinSymbol", "BinResponseCount", "BinPropensity"}
@@ -79,9 +91,21 @@ def test_score_distribution(sample: ADMDatamart): #testing
 
 
 def test_multiple_score_distributions(sample: ADMDatamart):
+    # First get the latest snapshot time
+    latest_snapshot = (
+        sample.aggregates.last(table="combined_data")
+        .select(pl.col("SnapshotTime").max())
+        .collect()
+        .item()
+    )
+    
+    # Get model IDs from the latest snapshot
     model_ids = (
         sample.aggregates.last(table="combined_data")
-        .filter(pl.col("PredictorName") == "Classifier")
+        .filter(
+            (pl.col("PredictorName") == "Classifier") & 
+            (pl.col("SnapshotTime") == latest_snapshot)
+        )
         .select(pl.col("ModelID").unique())
         .collect()
     )
