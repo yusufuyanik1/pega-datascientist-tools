@@ -17,7 +17,6 @@ from typing import (
     overload,
 )
 
-import pytest
 import polars as pl
 from typing_extensions import Concatenate, ParamSpec
 
@@ -459,55 +458,88 @@ class Plots(LazyNamespace):
             "ModelID",
         }
     )
-    def test_score_distribution(sample: ADMDatamart):
-        model_id = (
-            sample.aggregates.last(table="combined_data")
-            .filter(pl.col("PredictorName") == "Classifier")
-            .select("ModelID")
+    def score_distribution(
+        self,
+        model_id: str,
+        *,
+        return_df: bool = False,
+    ):
+        df = (
+            self.datamart.aggregates.last(table="combined_data")
+            .select(
+                {
+                    "PredictorName",
+                    "Name",
+                    "BinIndex",
+                    "BinSymbol",
+                    "BinResponseCount",
+                    "BinPropensity",
+                    "ModelID",
+                    "Configuration",
+                }
+                | set(
+                    self.datamart.context_keys,
+                )
+            )
+            .filter(
+                (pl.col("PredictorName") == "Classifier") & (pl.col("ModelID") == model_id)
+            )
+        ).sort("BinIndex")
+
+        if df.select(pl.first().count()).collect().item() == 0:
+            raise ValueError(f"There is no data for the provided modelid {model_id}")
+
+        if return_df:
+            return df
+
+        context = "/".join(
+            df.select(
+                pl.col("Configuration", *self.datamart.context_keys).fill_null(
+                    "MISSING"
+                )
+            )
+            .unique()
             .collect()
-            .row(0)[0]
+            .row(0)
+        )
+        return distribution_graph(
+            df,
+            f"""Classifier score distribution<br>
+            <sup>{context}</sup>
+            """,
         )
 
-        df = sample.plot.score_distribution(model_id=model_id, return_df=True)
+    def multiple_score_distributions(
+        self, query: Optional[QUERY] = None, show_all: bool = True
+    ) -> List[Figure]:
+        """Generate the score distribution plot for all models in the query
 
-        required_columns = {"BinIndex", "BinSymbol", "BinResponseCount", "BinPropensity"}
-        assert all(col in df.collect_schema().names() for col in required_columns)
+        Parameters
+        ----------
+        query : Optional[QUERY], optional
+            A query to apply to the data, by default None
+        show_all : bool, optional
+            Whether to 'show' all plots or just get a list of them, by default True
 
-        assert df.filter(pl.col("PredictorName") != "Classifier").collect().is_empty()
-
-        collected_df = df.collect()
-        bin_indices = collected_df["BinIndex"].to_list()
-        assert bin_indices == sorted(bin_indices)
-
-        with pytest.raises(ValueError, match="There is no data for the provided modelid"):
-            sample.plot.score_distribution(model_id="invalid_id")
-
-        plot = sample.plot.score_distribution(model_id=model_id)
-        assert plot is not None
-
-
-    def test_multiple_score_distributions(sample: ADMDatamart):
-        model_ids = (
-            sample.aggregates.last(table="combined_data")
-            .filter(pl.col("PredictorName") == "Classifier")
+        Returns
+        -------
+        List[go.Figure]
+            A list of Plotly charts, one for each model instance
+        """
+        plots = []
+        for model_id in (
+            cdh_utils._apply_query(
+                self.datamart.aggregates.last(table="combined_data"),
+                query,
+            )
             .select(pl.col("ModelID").unique())
-            .collect()
-        )
-
-        assert not model_ids.is_empty()
-
-        plots = sample.plot.multiple_score_distributions(show_all=False)
-
-        assert len(plots) == len(model_ids)
-
-        assert all(isinstance(plot, Figure) for plot in plots)
-
-        # Verify each plot has the required traces
-        for plot in plots:
-            assert len(plot.data) == 2
-            assert plot.data[0].type == "bar"  # Responses
-            assert plot.data[1].type == "scatter"  # Propensity
-
+            .collect()["ModelID"]
+        ):
+            fig = self.score_distribution(model_id=model_id)
+            if show_all:
+                fig.show()
+            plots.append(fig)
+        return plots
 
     @requires(
         combined_columns={
