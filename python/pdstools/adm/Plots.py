@@ -482,7 +482,7 @@ class Plots(LazyNamespace):
                 )
             )
             .filter(
-                pl.col("PredictorName") == "Classifier", pl.col("ModelID") == model_id
+                (pl.col("PredictorName") == "Classifier") & (pl.col("ModelID") == model_id)
             )
         ).sort("BinIndex")
 
