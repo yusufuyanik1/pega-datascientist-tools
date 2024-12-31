@@ -50,28 +50,14 @@ def test_proposition_success_rates(sample: ADMDatamart):
 
 
 def test_score_distribution(sample: ADMDatamart):
-    # First get the latest snapshot time
-    latest_snapshot = (
+    model_id = (
         sample.aggregates.last(table="combined_data")
-        .select(pl.col("SnapshotTime").max())
+        .filter(pl.col("PredictorName") == "Classifier")
+        .select("ModelID")
         .collect()
-        .item()
+        .row(0)[0]
     )
-    
-    # Get classifier data from the latest snapshot
-    classifier_data = (
-        sample.aggregates.last(table="combined_data")
-        .filter(
-            (pl.col("PredictorName") == "Classifier") & 
-            (pl.col("SnapshotTime") == latest_snapshot)
-        )
-        .collect()
-    )
-    
-    # Then get a model_id from the materialized data
-    model_id = classifier_data.select("ModelID").row(0)[0]
 
-    # Now use that model_id for score distribution
     df = sample.plot.score_distribution(model_id=model_id, return_df=True)
 
     required_columns = {"BinIndex", "BinSymbol", "BinResponseCount", "BinPropensity"}
@@ -91,21 +77,9 @@ def test_score_distribution(sample: ADMDatamart):
 
 
 def test_multiple_score_distributions(sample: ADMDatamart):
-    # First get the latest snapshot time
-    latest_snapshot = (
-        sample.aggregates.last(table="combined_data")
-        .select(pl.col("SnapshotTime").max())
-        .collect()
-        .item()
-    )
-    
-    # Get model IDs from the latest snapshot
     model_ids = (
         sample.aggregates.last(table="combined_data")
-        .filter(
-            (pl.col("PredictorName") == "Classifier") & 
-            (pl.col("SnapshotTime") == latest_snapshot)
-        )
+        .filter(pl.col("PredictorName") == "Classifier")
         .select(pl.col("ModelID").unique())
         .collect()
     )
@@ -147,6 +121,7 @@ def test_predictor_binning(sample: ADMDatamart):
     collected_df = df.collect()
     bin_indices = collected_df["BinIndex"].to_list()
     assert bin_indices == sorted(bin_indices)
+
     # Test error handling for invalid inputs
     with pytest.raises(ValueError):
         sample.plot.predictor_binning(
@@ -156,10 +131,12 @@ def test_predictor_binning(sample: ADMDatamart):
         sample.plot.predictor_binning(
             model_id=model_id, predictor_name="non_existent_predictor"
         )
+
     plot = sample.plot.predictor_binning(
         model_id=model_id, predictor_name=predictor_name
     )
     assert isinstance(plot, Figure)
+
     assert len(plot.data) == 2
     assert plot.data[0].type == "bar"  # Responses
     assert plot.data[1].type == "scatter"  # Propensity
@@ -167,6 +144,7 @@ def test_predictor_binning(sample: ADMDatamart):
 
 def test_multiple_predictor_binning(sample: ADMDatamart):
     model_id = sample.combined_data.select("ModelID").collect().row(0)[0]
+
     expected_predictor_count = (
         sample.combined_data.filter(pl.col("ModelID") == model_id)
         .select("PredictorName")
@@ -182,13 +160,6 @@ def test_multiple_predictor_binning(sample: ADMDatamart):
     assert len(plots) == expected_predictor_count
 
     assert all(isinstance(plot, Figure) for plot in plots)
-    
-    for plot in plots:
-        assert len(plot.data) == 2
-        assert plot.data[0].type == "bar"  # Responses
-        assert plot.data[1].type == "scatter"  # Propensity
-    
-    sample.plot.multiple_predictor_binning(model_id="invalid_id", show_all=False) == []
 
     for plot in plots:
         assert len(plot.data) == 2
