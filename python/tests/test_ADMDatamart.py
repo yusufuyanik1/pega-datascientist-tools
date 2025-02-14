@@ -63,3 +63,6 @@ def test_write_then_load(sample: ADMDatamart):
 
 def dummy_function():
     return None
+
+def another_test():
+    return None
