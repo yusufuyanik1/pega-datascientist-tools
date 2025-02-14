@@ -58,3 +58,8 @@ def test_write_then_load(sample: ADMDatamart):
 #     ADMDatamart(predictor_df=pl.scan_ipc(predictordata_cache))
 
 
+
+
+
+def dummy_function():
+    return None
