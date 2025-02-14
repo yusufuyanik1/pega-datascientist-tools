@@ -8,6 +8,7 @@ import streamlit as st
 from pdstools.utils.streamlit_utils import model_selection_df
 from pdstools.utils.show_versions import show_versions
 from pdstools.utils.cdh_utils import _apply_query
+from pdstools import ADMDatamart
 
 if "dm" not in st.session_state:
     st.warning("Please configure your files in the `data import` tab.")
@@ -82,16 +83,22 @@ with health_check:
             st.warning("Please upload Predictor Snapshot to include binning!")
         if st.button("Create Tables"):
             with st.spinner("Creating Tables..."):
+                filtered_datamart = ADMDatamart(
+                    st.session_state["dm"].model_data,
+                    st.session_state["dm"].predictor_data,
+                    query=st.session_state.get("filters", None),
+                )
                 tablename = "ADMSnapshots.xlsx"
-                tables = st.session_state["dm"].generate.excel_report(
+                tables, warning_messages = filtered_datamart.generate.excel_report(
                     tablename,
                     predictor_binning=include_binning,
-                    query=(st.session_state.get("filters", None)),
                 )
                 st.session_state["run"][st.session_state["runID"]]["tables"] = tablename
                 st.session_state["run"][st.session_state["runID"]]["tablefile"] = open(
                     tables, "rb"
                 )
+                for message in warning_messages:
+                    st.warning(message)
 
             btn = st.download_button(
                 label="Download additional tables",
@@ -109,6 +116,7 @@ with health_check:
             )
             with open(log_file_path, "w") as log_file:
                 log_file.write(st.session_state.log_buffer.getvalue())
+                log_file.write(show_versions(print_output=False))
             with open(log_file_path, "rb") as f:
                 btn = st.download_button(
                     label="Download error log",
@@ -146,7 +154,7 @@ if st.session_state["dm"].predictor_data is not None:
                 value=True,
             )
             st.session_state["selected_models"] = edited_df.loc[
-                edited_df["Generate Report"] == True
+                edited_df["Generate Report"]
             ]["ModelID"].to_list()
             st.write(f"{len(st.session_state['selected_models'])} models are selected")
             if len(st.session_state["selected_models"]) > 0:
@@ -168,7 +176,6 @@ if st.session_state["dm"].predictor_data is not None:
                             model_ids=st.session_state["selected_models"],
                             name="",
                             output_dir=working_dir,
-                            query=st.session_state.get("filters", None),
                             only_active_predictors=st.session_state[
                                 "only_active_predictors"
                             ],
@@ -201,7 +208,6 @@ if st.session_state["dm"].predictor_data is not None:
                 log_file_path = f"pdstools_error_log_{datetime.now().isoformat().replace(':', '_')}.txt"
                 with open(log_file_path, "w") as log_file:
                     log_file.write(st.session_state.log_buffer.getvalue())
-                    log_file.write("\n\n--- Version Information ---\n")
                     log_file.write(show_versions(print_output=False))
                 with open(log_file_path, "rb") as f:
                     btn = st.download_button(
